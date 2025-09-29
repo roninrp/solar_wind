@@ -518,6 +518,8 @@ def make_training_data(ips_data, omni_data, min_input_len=20):
         #     time_0 = np.concatenate((time*np.ones(len(x_brckt)), np.zeros(32 - len(x_brckt)) ))
         time_0 = time*np.ones(32)
         x_brckt['time_trgt'] = pd.Series(time_0) 
+        # Adding input column to indicate missing rows as 0
+        x_brckt['input'] = pd.Series(np.concatenate([np.ones(x_brckt_len), np.zeros(32 - x_brckt_len)]))
             
         # Uncomment line below to return a list with X and y as pd.DataFrames
         # out_data.append([j, x_brckt, omni_data.iloc[i: i + 16] ]) 
@@ -544,6 +546,7 @@ print(f"Generating column names in list clmns_data for the final data from curat
 clmns_ips = list(df_5.columns)
 clmns_ips.pop(0)
 clmns_ips.append('time_trgt')
+clmns_ips.append('input')
 print(clmns_ips, len(clmns_ips))
 clmns_input = []
 for i in range(32):
@@ -591,17 +594,9 @@ for i in range(32):
     full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'] - full_df[f"X_time_{i}"]
     full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'].apply(lambda x: 0.0 if x > 1 else x )
 
-def nan_maker(row):
-    """
-    Makes input rows 'X_..' np.nan if 'X_time_trgt_i' == 0.0
-    """
-    for i in range(32):
-        if row[f"X_time_trgt_{i}"] == 0.0:
-            for clm in X_clms:
-                row[f"X_{clm}_{i}"] = np.nan
-    return row
-print("Making input entries in columns 'X_..' np.nan where 'X_time_trgt_i' = 0.0 ")
-full_1_df = full_1_df.apply(nan_maker, axis=1)
+print(f"Making sure 'X-input_i' is 0 for missing inputs")
+for i in range(32):
+    full_df[f'X_input_{i}'] = full_df[f'X_dist_{i}'].map(lambda x: 0 if x == 0 else 1)
 
 print("Storing to disk final_data/missing_df.csv")
 full_1_df.to_csv('final_data/full_1_df.csv', float_format='%.17g', index=False)
