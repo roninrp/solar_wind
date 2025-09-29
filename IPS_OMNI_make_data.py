@@ -9,6 +9,21 @@ from time import sleep
 import seaborn as sns
 import pickle
 
+"""
+This modeul takes in the IPS data stored in 'test_dwnld/', smoothened OMNI data and Sun-spots data and generates the output .csv file for the time series prediction with:
+
+i: index of observations
+X: input features(12) of IPS and sunspot obs. for the past 32 quarter-day intervals (8-days)------12x32 columns
+y: target OMNI data for the future 16 quarter-day intervals (4-days)-----------2x16columns
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+The IPS data is staggered, therefore input X may not be present for any given time. The program generates time-series data where input X atleast has 
+20 observations in the past 8-days.
+
+"""
+
+
+
 # The file format is as follows;
 
 print("""
@@ -569,5 +584,25 @@ missing_df.to_csv('final_data/missing_df.csv',  index=False)
 print("Converting final data into DataFrame and storing to disk as 'final_data/full_1_df.csv'")
 # Converting final data into DataFrame and storing to disk
 full_1_df = pd.DataFrame(full_out_1, columns=clmns_data)
+
+print("Converting 'X_time_trgt_i' columns to 'X_time_trgt_i' - 'X_time_i' ")
+print("Converting 'X_time_trgt_i' columns to 0.0 if 'X_time_trgt_{i} > 1' as this would imply the input rows 'X_..' are 0.0 i.e. no entries ")
+for i in range(32):
+    full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'] - full_df[f"X_time_{i}"]
+    full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'].apply(lambda x: 0.0 if x > 1 else x )
+
+def nan_maker(row):
+    """
+    Makes input rows 'X_..' np.nan if 'X_time_trgt_i' == 0.0
+    """
+    for i in range(32):
+        if row[f"X_time_trgt_{i}"] == 0.0:
+            for clm in X_clms:
+                row[f"X_{clm}_{i}"] = np.nan
+    return row
+print("Making input entries in columns 'X_..' np.nan where 'X_time_trgt_i' = 0.0 ")
+full_1_df = full_1_df.apply(nan_maker, axis=1)
+
+print("Storing to disk final_data/missing_df.csv")
 full_1_df.to_csv('final_data/full_1_df.csv', float_format='%.17g', index=False)
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
