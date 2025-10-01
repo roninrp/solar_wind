@@ -4,7 +4,27 @@ from torch.utils.data import Dataset
 
 class DatasetHist(Dataset):
     """
-    Takes data from pd.DataFrame as produced by IPS_OMNI_make_data
+    Takes data from pd.DataFrame as produced by IPS_OMNI_make_data where 
+    data is stored as a pd.DataFrame with columns=['idx', 'X...', 'y...']
+    'X..': is of the form "X_{in_clmns}_{i}"
+    in_clmns: is in  ['dist', 'hla', 'hlo', 'gla', 'glo', 'carr', 'v', 'er', 'sc-indx', 'time', 's_spts', 'time_trgt', 'input']
+    i: is in range(32)
+    Similarly 
+    'y..': is of the form "y_{out_clmns}_{j}"
+    out_clmns: is in [swSpeed_Smth, time]
+    j: is in range(16)
+    
+    ----------------------------------------------------------------------------------------------------------------------------------------
+    Params:
+    file_path: path of pd.DataFrame produced by IPS_OMNI_make_data
+
+    ----------------------------------------------------------------------------------------------------------------------------------------
+    Returns:
+    ID, X, y
+    ID: index of data point
+    X: input data np.array of shape (32, 12)
+    y: target data np.array of shape (12, 2) 
+    
     """
     def __init__(self, file_path:str, typ='train'):
 
@@ -29,7 +49,8 @@ class DatasetHist(Dataset):
 
     def __getitem__(self, idx:int):
         ID = self.ids[idx]
-        X = self.data[self.X_clmns].loc[ID].values.reshape(32, -1) #------------------------# 31x13 np.array
-        y = self.data[self.y_clmns].loc[ID].values.reshape(16, -1) #------------------------# 16x2  np.array
+        X = self.data[self.X_clmns].loc[ID].values.reshape(32, -1).transpose() #------------------------# 32x13 np.array
+        y = self.data[self.y_clmns].loc[ID].values.reshape(16, -1).transpose() #------------------------# 16x2  np.array
 
         return ID, X, y
+        
