@@ -587,11 +587,19 @@ missing_df.to_csv('final_data/missing_df.csv',  index=False)
 print("Converting final data into DataFrame and storing to disk as 'final_data/full_1_df.csv'")
 # Converting final data into DataFrame and storing to disk
 full_1_df = pd.DataFrame(full_out_1, columns=clmns_data)
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-print("Converting 'X_time_trgt_i' columns to 'X_time_trgt_i' - 'X_time_i' ")
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+print("Converting 'y_time_i' columns to 'y_time_i' - 'y_time_0'")
+for i in range(16):
+    full_1_df[f'y_time_{i}'] = full_1_df[f'y_time_{i}'] - full_1_df[f'y_time_0'] 
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+print("Converting 'X_time_trgt_i' columns to 'X_time_i' - 'X_time_trgt_i'")
 print("Converting 'X_time_trgt_i' columns to 0.0 if 'X_time_trgt_{i} > 1' as this would imply the input rows 'X_..' are 0.0 i.e. no entries ")
 for i in range(32):
-    full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'] - full_df[f"X_time_{i}"]
+    full_1_df[f'X_time_trgt_{i}'] = full_df[f"X_time_{i}"] - full_df[f'X_time_trgt_{i}']
     full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'].apply(lambda x: 0.0 if x > 1 else x )
 
 print(f"Making sure 'X-input_i' is 0 for missing inputs")
