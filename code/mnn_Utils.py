@@ -37,8 +37,8 @@ class posEncoder(nn.Module):
         self.xLn = nn.LayerNorm((emDim,ipLen))
         self.peLn = nn.LayerNorm((emDim,ipLen))
 
-    def forward(self,X,T):
-        return self.xLn(X),  self.peLn(self.posEm)
+    def forward(self,X):
+        return self.xLn(X) + self.peLn(self.posEm)
 
 
 ##################---------------Encoder-------------------------###########################################################################
@@ -51,12 +51,12 @@ class conv1Dencoder(nn.Module):
         self.posEm = posEncoder(emDim=emDim, ipLen=LEN, device = device) #------------------# Postional_Encoding: ipLen is length of input X (i.e. seq length)
 
         # self.conv1d takes a matrix of dimensions  channels x images
-        # here image starts off as of LEN=32 referring to the 32 equally spaced intervals spanning 8-days
-        # and channels starts off as xCh or tCh = 7 referring to the 7 different features which then transforms to 128 after posEncoder
+        # here image starts off as of LEN=32 referring to the 32  intervals spanning 8-days into the past
+        # and channels starts off as xCh or tCh = 13 referring to the 713different features which then transforms to 128 after self.xProj and posEncoder
 
-        self.conv1 = nn.Conv1d(emDim,256,3,1,padding='same') # ---------- # channels: 128->256, image:32, final: 2x256
+        self.conv1 = nn.Conv1d(emDim,256,3,1,padding='same') # ---------- # channels: 128->256, image:32, final: 256x32 (=channelsximages)
         self.pool1 = nn.MaxPool1d(2)                         # ---------- # image: 32-> 32/2, final: channelx16
-        self.proj1 = nn.Conv1d(emDim,256,1,2)                # ---------- # channels: emDim->256, image: image/2, final: (image/2)x256
+        self.proj1 = nn.Conv1d(emDim,256,1,2)                # ---------- # channels: emDim->256, image: image/2, final: 256x(image/2)
         
         self.conv2 = nn.Conv1d(256,512,3,1,padding='same')
         self.pool2 = nn.MaxPool1d(2)
@@ -67,18 +67,18 @@ class conv1Dencoder(nn.Module):
         self.proj3 = nn.Conv1d(512,1024,1,2)
 
     def forward(self,X,T):
-        x1 = self.posEm(self.xProj(X))
+        x1 = self.posEm(self.xProj(X))                             # X = (batch, features, images) = (batch, 13, 32); x1 = (batch, 128, 32)
 
-        x2  = torch.relu( self.pool1( self.conv1(x1) ) )
+        x2  = torch.relu( self.pool1( self.conv1(x1) ) )           # x2 = (batch, 256, 16); self.proj1(x1) = (batch, 256, 16)
         x2  = x2 + self.proj1(x1)
         
-        x3  = torch.relu( self.pool2( self.conv2(x2) ) )
+        x3  = torch.relu( self.pool2( self.conv2(x2) ) )           # x3 = (batch, 512, 8); self.proj2(x2) = (batch, 512, 8)
         x3  = x3 + self.proj2(x2)
         
-        x4  = torch.relu( self.pool3( self.conv3(x3) ) )
+        x4  = torch.relu( self.pool3( self.conv3(x3) ) )           # x4 = (batch, 1024, 4); self.proj3(x3) = (batch, 1024, 4)
         x4  = x4 + self.proj3(x3) # ------------- 4x1024
 
-        return torch.flatten(x4,1) # ------------- (N, 4096)             # needs to return (N, 2, 2048) where one of the features would morph into the target time column.
+        return torch.flatten(x4,1) # ------------- (N, 4096)       # needs to return (N, 2, 2048) where one of the features would morph into the target time column.
 
 ###################-----------Model_block-----------------###############################################################################
 #########################################################################################################################################
@@ -89,10 +89,13 @@ class model_block(nn.Module):
         super(model_block, self).__init__()
         self.enc1 = conv1Dencoder(xCh=xCh,  LEN=LEN, emDim=emDim, device = device)
         self.ln1 = nn.LayerNorm(4096)
+        
         self.fc1 = nn.Linear(4096,1024)
         self.pr1 = nn.Linear(4096,256)
+        
         self.fc2 = nn.Linear(1024,256)
         self.fc3 = nn.Linear(256,64)
+        
         self.output = nn.Linear(64,16)
         self.dropout = nn.Dropout(dropout)
 

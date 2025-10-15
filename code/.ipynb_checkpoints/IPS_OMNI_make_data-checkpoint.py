@@ -464,7 +464,7 @@ def make_training_data(ips_data, omni_data, min_input_len=20):
     """
     Construct training data as follows:
     Begining at every hour i of the omni_data construct
-    the target y: 16 omni_data obs into the future begining at hour i i.e. omin_data 4 days into the future
+    the target y: 16 omni_data equally spaced obs into the future begining at hour i i.e. omin_data 4 days into the future
     the input  x: best ips_data from 8-days into the past begining from the hour i as a pd.DataFrame().values
     
     
@@ -490,7 +490,7 @@ def make_training_data(ips_data, omni_data, min_input_len=20):
     """
     
     out_data = [] 
-    j = 0  # index 
+    j = 0  # index, counts serially only the data that gets produced
     k = 0  # no.of samples skipped
     missing = []
     for i in range(len(omni_data) - 16):
@@ -561,7 +561,7 @@ clmns_data = ['idx'] + clmns_input + clmns_target
 print("""\n
 The final data has 1 + 12x32 + 2x16 = 417 columns where
 1: corresponds to the index
-12x32: corresponds to X input with 12 columns of the currated IPS data repeated for 32 obs.(8-days into past) with np.zeros used if no.of IPS obs. < 32
+13x32: corresponds to X input with 13 columns of the currated IPS data repeated for 32 obs.(8-days into past) with np.zeros used if no.of IPS obs. < 32
 2x16: corresponds to OMNI smoothened wind speed and time for 16 obs.(4-days into future)
 
 12 IPs columns correspond to the 11 mentioned previously and one denoting input time which same for all 32 data points.\n

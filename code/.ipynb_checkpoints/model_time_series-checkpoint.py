@@ -22,8 +22,8 @@ class DatasetHist(Dataset):
     Returns:
     ID, X, y
     ID: index of data point
-    X: input data np.array of shape (32, 12)
-    y: target data np.array of shape (12, 2) 
+    X: input data np.array of shape (32, 13)
+    y: target data np.array of shape (16, 2) 
     
     """
     def __init__(self, file_path:str, typ='train'):
@@ -35,6 +35,7 @@ class DatasetHist(Dataset):
         # Similarly 'y..': is of the form "y_{out_clmns}_{j}"
         # where out_clmns is in [swSpeed_Smth, time]
         # and j is in range(16)
+        
         self.data = pd.read_csv(file_path)
         self.ids = self.data.idx.values
         self.in_clmns = [x[2:-2] for x in list(self.data.columns)[1: 13 + 1]]
