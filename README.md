@@ -1,4 +1,4 @@
-Solar Wind Speed Prediction using IPS data.
+## Solar Wind Speed Prediction using IPS data.
 ------------------------------------------------------------------------------------------------------------------------------------------
 Solar winds are plasma hurtled away from the Sun and carries its magnetic field further away.
 Their speeds (200km/s-800km/s) are not constant due to plsama interacting with magnetic fields generated in the process.

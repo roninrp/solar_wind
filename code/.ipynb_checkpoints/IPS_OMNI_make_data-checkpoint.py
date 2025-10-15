@@ -9,6 +9,20 @@ from time import sleep
 import seaborn as sns
 import pickle
 
+"""
+This modeul takes in the IPS data stored in 'test_dwnld/', smoothened OMNI data and Sun-spots data and generates the output .csv file for the time series prediction with:
+
+i: index of observations
+X: input features(12) of IPS and sunspot obs. for the past 32 quarter-day intervals (8-days)------12x32 columns
+y: target OMNI data for the future 16 quarter-day intervals (4-days)-----------2x16columns
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+The IPS data is staggered, therefore input X may not be present for any given time. The program generates time-series data where input X atleast has 20 observations in the past 8-days.
+
+"""
+
+
+
 # The file format is as follows;
 
 print("""
@@ -63,7 +77,7 @@ Of these only a subset would be used for curation after preprocessing.\n\n
 print(f"Preparing IPS data expects IPS data in forlder test_dwnld/.")
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------
-vlist_directory = 'test_dwnld/'
+vlist_directory = '../test_dwnld/'
 
 url = 'https://stsw1.isee.nagoya-u.ac.jp/vlist/'
 print(f"IPS data can be found in {url}.")
@@ -503,6 +517,8 @@ def make_training_data(ips_data, omni_data, min_input_len=20):
         #     time_0 = np.concatenate((time*np.ones(len(x_brckt)), np.zeros(32 - len(x_brckt)) ))
         time_0 = time*np.ones(32)
         x_brckt['time_trgt'] = pd.Series(time_0) 
+        # Adding input column to indicate missing rows as 0
+        x_brckt['input'] = pd.Series(np.concatenate([np.ones(x_brckt_len), np.zeros(32 - x_brckt_len)]))
             
         # Uncomment line below to return a list with X and y as pd.DataFrames
         # out_data.append([j, x_brckt, omni_data.iloc[i: i + 16] ]) 
@@ -529,6 +545,7 @@ print(f"Generating column names in list clmns_data for the final data from curat
 clmns_ips = list(df_5.columns)
 clmns_ips.pop(0)
 clmns_ips.append('time_trgt')
+clmns_ips.append('input')
 print(clmns_ips, len(clmns_ips))
 clmns_input = []
 for i in range(32):
@@ -569,5 +586,25 @@ missing_df.to_csv('final_data/missing_df.csv',  index=False)
 print("Converting final data into DataFrame and storing to disk as 'final_data/full_1_df.csv'")
 # Converting final data into DataFrame and storing to disk
 full_1_df = pd.DataFrame(full_out_1, columns=clmns_data)
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+print("Converting 'y_time_i' columns to 'y_time_i' - 'y_time_0'")
+for i in range(16):
+    full_1_df[f'y_time_{i}'] = full_1_df[f'y_time_{i}'] - full_1_df[f'y_time_0'] 
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+print("Converting 'X_time_trgt_i' columns to 'X_time_i' - 'X_time_trgt_i'")
+print("Converting 'X_time_trgt_i' columns to 0.0 if 'X_time_trgt_{i} > 1' as this would imply the input rows 'X_..' are 0.0 i.e. no entries ")
+for i in range(32):
+    full_1_df[f'X_time_trgt_{i}'] = full_df[f"X_time_{i}"] - full_df[f'X_time_trgt_{i}']
+    full_1_df[f'X_time_trgt_{i}'] = full_df[f'X_time_trgt_{i}'].apply(lambda x: 0.0 if x > 1 else x )
+
+print(f"Making sure 'X-input_i' is 0 for missing inputs")
+for i in range(32):
+    full_df[f'X_input_{i}'] = full_df[f'X_dist_{i}'].map(lambda x: 0 if x == 0 else 1)
+
+print("Storing to disk final_data/missing_df.csv")
 full_1_df.to_csv('final_data/full_1_df.csv', float_format='%.17g', index=False)
 # ------------------------------------------------------------------------------------------------------------------------------------------------------

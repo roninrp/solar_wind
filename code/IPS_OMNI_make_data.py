@@ -17,8 +17,7 @@ X: input features(12) of IPS and sunspot obs. for the past 32 quarter-day interv
 y: target OMNI data for the future 16 quarter-day intervals (4-days)-----------2x16columns
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-The IPS data is staggered, therefore input X may not be present for any given time. The program generates time-series data where input X atleast has 
-20 observations in the past 8-days.
+The IPS data is staggered, therefore input X may not be present for any given time. The program generates time-series data where input X atleast has 20 observations in the past 8-days.
 
 """
 
@@ -78,7 +77,7 @@ Of these only a subset would be used for curation after preprocessing.\n\n
 print(f"Preparing IPS data expects IPS data in forlder test_dwnld/.")
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------
-vlist_directory = 'test_dwnld/'
+vlist_directory = '../test_dwnld/'
 
 url = 'https://stsw1.isee.nagoya-u.ac.jp/vlist/'
 print(f"IPS data can be found in {url}.")
