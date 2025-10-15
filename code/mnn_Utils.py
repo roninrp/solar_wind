@@ -76,9 +76,10 @@ class conv1Dencoder(nn.Module):
         x3  = x3 + self.proj2(x2)
         
         x4  = torch.relu( self.pool3( self.conv3(x3) ) )           # x4 = (batch, 1024, 4); self.proj3(x3) = (batch, 1024, 4)
-        x4  = x4 + self.proj3(x3) # ------------- 4x1024
+        x4  = x4 + self.proj3(x3) # ------------- 1024x4
 
-        return torch.flatten(x4,1) # ------------- (N, 4096)       # needs to return (N, 2, 2048) where one of the features would morph into the target time column.
+        return torch.flatten(x4,1) # ------------- (N, 4096)       # probably needs to return (N, 2048, 2) where one of the features would morph into the target time column.
+        # return x4.reshape(x4.shape[0], 2048, 2)
 
 ###################-----------Model_block-----------------###############################################################################
 #########################################################################################################################################
@@ -96,7 +97,8 @@ class model_block(nn.Module):
         self.fc2 = nn.Linear(1024,256)
         self.fc3 = nn.Linear(256,64)
         
-        self.output = nn.Linear(64,16)
+        # self.output = nn.Linear(64,16)                       #---------------probably change this to nn.Linear(64, 32) so that 31 can be reshaped to (2, 16)
+        self.output = nn.Linear(64, 32).reshape(2, 16)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, X):
@@ -105,4 +107,4 @@ class model_block(nn.Module):
         x2 = torch.sigmoid( self.fc2(x1) ) + self.pr1(xenEm) #-------------# 256
         x2 = self.dropout(x2)                                #-------------# 256
         x3 = self.dropout( torch.sigmoid( self.fc3(x2) ) )   #-------------# 64
-        return torch.sigmoid( self.output(x3) )              #-------------# 16
+        return torch.sigmoid( self.output(x3))              #-------------# 2x16
