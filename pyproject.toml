@@ -1,0 +1,12 @@
+[project]
+name = "solar_wind"
+version = "0"
+dependencies = [
+    "pandas>=2.3.3",
+    "seaborn>=0.13.2",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.4.9",
+]
