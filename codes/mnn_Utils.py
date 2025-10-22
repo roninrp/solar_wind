@@ -66,7 +66,7 @@ class conv1Dencoder(nn.Module):
         self.pool3 = nn.MaxPool1d(2)
         self.proj3 = nn.Conv1d(512,1024,1,2)
 
-    def forward(self,X,T):
+    def forward(self,X):
         x1 = self.posEm(self.xProj(X))                             # X = (batch, features, images) = (batch, 13, 32); x1 = (batch, 128, 32)
 
         x2  = torch.relu( self.pool1( self.conv1(x1) ) )           # x2 = (batch, 256, 16); self.proj1(x1) = (batch, 256, 16)
@@ -85,9 +85,9 @@ class conv1Dencoder(nn.Module):
 #########################################################################################################################################
 # Needs to change to take input of the shape (N, 2, 2048) instead of (N, 1, 4096) so as to give an output of the shape (N, 2, 16) instead of (N, 16)
 
-class model_block(nn.Module):
+class model_base(nn.Module):
     def __init__(self, xCh = 13, LEN=32, emDim=128, dropout=0.3, device=device):
-        super(model_block, self).__init__()
+        super(model_base, self).__init__()
         self.enc1 = conv1Dencoder(xCh=xCh,  LEN=LEN, emDim=emDim, device = device)
         self.ln1 = nn.LayerNorm(4096)
         
@@ -97,8 +97,8 @@ class model_block(nn.Module):
         self.fc2 = nn.Linear(1024,256)
         self.fc3 = nn.Linear(256,64)
         
-        # self.output = nn.Linear(64,16)                       #---------------probably change this to nn.Linear(64, 32) so that 31 can be reshaped to (2, 16)
-        self.output = nn.Linear(64, 32).reshape(2, 16)
+        self.output = nn.Linear(64,16)                       #---------------probably change this to nn.Linear(64, 32) so that 31 can be reshaped to (2, 16)
+        # self.output = nn.Linear(64, 32).reshape(2, 16)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, X):
@@ -107,4 +107,5 @@ class model_block(nn.Module):
         x2 = torch.sigmoid( self.fc2(x1) ) + self.pr1(xenEm) #-------------# 256
         x2 = self.dropout(x2)                                #-------------# 256
         x3 = self.dropout( torch.sigmoid( self.fc3(x2) ) )   #-------------# 64
-        return torch.sigmoid( self.output(x3))              #-------------# 2x16
+        x4 = torch.sigmoid( self.output(x3))              #-------------# 2x16
+        return x4

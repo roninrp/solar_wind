@@ -2,6 +2,8 @@
 name = "solar_wind"
 version = "0"
 dependencies = [
+    "matplotlib>=3.10.7",
+    "numpy>=2.3.4",
     "pandas>=2.3.3",
     "seaborn>=0.13.2",
     "torch>=2.9.0",
