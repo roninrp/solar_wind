@@ -107,5 +107,6 @@ class model_base(nn.Module):
         x2 = torch.sigmoid( self.fc2(x1) ) + self.pr1(xenEm) #-------------# 256
         x2 = self.dropout(x2)                                #-------------# 256
         x3 = self.dropout( torch.sigmoid( self.fc3(x2) ) )   #-------------# 64
-        x4 = torch.sigmoid( self.output(x3))              #-------------# 2x16
-        return x4
+        x4 = torch.sigmoid( self.output(x3))
+        x5 = x4.reshape(x4.shape[0], -1, 16)             #-------------# 1x16
+        return x5

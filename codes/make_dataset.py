@@ -54,7 +54,7 @@ class DatasetHist(Dataset):
     def __getitem__(self, idx:int):
         ID = self.ids[idx]
         X = self.data[self.X_clmns].loc[self.data.idx==ID].values.reshape(32, -1).transpose() #------------------------# 13x32 np.array
-        y = self.data[self.y_clmns].loc[self.data.idx==ID].values.reshape(16).transpose() #------------------------# 16  np.array, as time is not choosen in the target
+        y = self.data[self.y_clmns].loc[self.data.idx==ID].values.reshape(16, -1).transpose() #------------------------# 16  np.array, as time is not choosen in the target
 
         return ID, X, y
         
