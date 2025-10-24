@@ -9,6 +9,7 @@ from time import sleep
 import seaborn as sns
 import pickle
 pd.set_option('display.float_format', lambda x: f'{x:.10f}')
+from termcolor import colored
 
 """
 This module contains the class ips_omni_processor() which allows the making of input data from:
@@ -118,7 +119,7 @@ class ips_omni_processor():
         self.omni_start_date_prv_mnth_str = "-".join([
             x 
             if i != 1 
-            else (str(int(x) + 1) if len(str(int(x) + 1)) == 2 else "0"+str(int(x) + 1)) 
+            else (str(int(x) - 1) if len(str(int(x) - 1)) == 2 else "0"+str(int(x) - 1)) 
             for i, x in enumerate(str(self.omni_df.iloc[0,0]).split("-"))
         ])
         
@@ -153,7 +154,7 @@ class ips_omni_processor():
                 self.df_5[column] = (self.df_5[column]- self.df_5[column].min())/ (self.df_5[column].max() - self.df_5[column].min())
         
         self.omni_df['yrmndy_hr'] = pd.to_datetime(self.omni_df.yrmndy_hr)
-        self.omni_df['time'] = (1000 - (pd.to_datetime('2050-01-01') - self.omni_df.yrmndy_hr).map(lambda x: 1000*(x.days + x.seconds/(24*60*60)))/self.delta_t).round(8)
+        self.omni_df['time'] = (1000 - (pd.to_datetime('2050-01-01') - self.omni_df.yrmndy_hr).map(lambda x: 1000*(x.days + x.seconds/(24*60*60)))/self.delta_t)
         self.omni_df.drop(columns=['yrmndy_hr'], inplace=True)
         
 
@@ -396,12 +397,71 @@ class ips_omni_processor():
         # Making the final data 
         out_df, missing_df = self.make_training_data(ips_df, omni_df)
         
-        print(f"scaling data's time columns")
+        print(f"scaling output data's time columns")
         for column in out_df.columns:
             if "time" in column:
                 out_df[column] = out_df[column]/1000
         return out_df, missing_df
+        
 
 
 if __name__ == "__main__":
+    ips_omni = ips_omni_processor(ips_path="../data/test_dwnld/", 
+                                  sun_spot_path='../data/SN_d_tot_V2.0.csv', 
+                                  omni_path='../data/omni_avg_normalised_smoothed_extened.csv'
+                                 )
+    # Making full data set 
+    print("Making full data set")
+    full_df, missing = ips_omni.make_final_data(ips_omni.df_5, ips_omni.omni_df)
+
+    # Storing full data set and missing statistics  in ../data/data_generated/
+    print("Storing full data set and missing statistics  in ../data/data_generated/")
+    full_df.to_csv("../data/data_generated/full_df.csv")
+    missing.to_scv("../data/data_generated/missing.csv")
+
+    # Testing the full dataset for NaNs
+    print("Testing the full dataset for NaNs")
+    if int((full_df == pd.isnull).sum().sum()) != 0:
+        print(colored("Error in full_df, NaNs found!", "red"))
+        for column in full_df.columns:
+            # print(column, full_df[column].isnull().sum()) 
+            if full_df[column].isnull().any():
+                print(colored("Problem in full_df, NaNs found in the following column:", "red"))
+                print(column, full_df[column].isnull().sum())
+        
+    else:
+        print("No NaNs found in full_df, proceeding further....\n")
+
+        # Making train val and test splits
+        print("Making train val and test splits")
+        # these are stored in ../data/data_generated/train/, ../data/data_generated/val/ and ../data/data_generated/test/ folders
+        print("these are stored in ../data/data_generated/train/, ../data/data_generated/val/ and ../data/data_generated/test/ folders")
     
+        # Required so that there is no overlap between train, val and test. The minimum interval is 4 days as the target spans 4 days into the future.
+        fourdays = ips_omni.delta_8/2000 
+    
+        # Finding the index for marking the train val slpit without overlap
+        print("Finding the index for marking the train val slpit without overlap")
+        train_val_mark_0 = int(((2050 - ips_omni.delta_t*(1 - full_df.X_time_trgt_0 )//365) <= 2013).sum())
+        print(train_val_mark_0)
+        train_val_mark_1 = full_df.loc[(full_df.index >= train_val_mark_0) & (full_df.X_time_trgt_0 > full_df.iloc[train_val_mark_0].X_time_trgt_0 + fourdays)].index[0]
+        print(train_val_mark_1)
+    
+        # Finding the index for marking the val test slpit without overlap
+        print("Finding the index for marking the val test slpit without overlap")
+        val_test_mark_0 = ((2050 - ips_omni.delta_t*(1 - full_df.X_time_trgt_0 )//365) < 2017).sum()
+        print(val_test_mark_0)
+        val_test_mark_1 = full_df.loc[(full_df.index >= val_test_mark_0) & (full_df.X_time_trgt_0 > full_df.iloc[val_test_mark_0].X_time_trgt_0 + fourdays)].index[0]
+        print(val_test_mark_1)
+    
+        # Making train, val and test pd.DataFrames
+        print("Making train, val and test pd.DataFrames")
+        train_ips_omni_df = full_df.iloc[:train_val_mark_0]
+        val_ips_omni_df = full_df.iloc[train_val_mark_1:val_test_mark_0]
+        test_ips_omni_df = full_df.iloc[val_test_mark_1:]
+    
+        # Storing train, val and test in seperate folders in  ../data/data_generated/
+        print("Storing train, val and test in seperate folders in  ../data/data_generated/")
+        train_ips_omni_df.to_csv("../data/data_generated/train/train_ips_omni_df.csv", index=False)
+        val_ips_omni_df.to_csv("../data/data_generated/val/val_ips_omni_df.csv", index=False)
+        test_ips_omni_df.to_csv("../data/data_generated/test/test_ips_omni_df.csv", index=False)

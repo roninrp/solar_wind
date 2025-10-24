@@ -32,7 +32,7 @@ train_steps = 2
 resultsPath = "../model_ouputs/"
 mString = 'base_test_en'
 
-# Load paths for train, val test -----------------------------------------------------------------------------------------------
+# Load paths for train, val and test -----------------------------------------------------------------------------------------------
 train_path = "../data/data_generated/train/train_ips_omni_df.csv"
 val_path = "../data/data_generated/val/val_ips_omni_df.csv"
 test_path = "../data/data_generated/test/test_ips_omni_df.csv"
