@@ -60,7 +60,7 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
     test_load = DataLoader(test_set, batch_size=len(test_set), shuffle=False)
 
     # Load model
-    model = mnn.model_base(xCh=13, LEN=32, emDim=128, dropout=dropout, device=None)
+    model = mnn.model_base(xCh=13, LEN=32, emDim=128, dropout=dropout, device=device)
     # Use GPU, only when available
     model = model.to(device)
 
@@ -112,9 +112,9 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
         return running_loss, running_loss_y
 
     def doStep(data):
-        x = data[1].to(torch.float32)
+        x = data[1].to(torch.float32).to(device)
         # print("x", x)
-        y = data[2].to(torch.float32)
+        y = data[2].to(torch.float32).to(device)
         y_out = model(x)
         # print("Before backward:", torch.isnan(y_out).any()) 
 
@@ -152,7 +152,7 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
             for batch in test_load:
                 testBatch = batch
                 break
-            x = testBatch[1].to(torch.float32)
+            x = testBatch[1].to(torch.float32).to(device)
             # y = testBatch[2]
             opY = model(x).detach().cpu().numpy()
 
