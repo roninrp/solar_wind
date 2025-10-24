@@ -3,3 +3,4 @@ test_dwnld/
 *.csv
 data/
 model_outputs/
+*_checkpoints/
