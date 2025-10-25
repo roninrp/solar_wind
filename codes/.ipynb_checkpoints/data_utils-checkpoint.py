@@ -417,7 +417,7 @@ if __name__ == "__main__":
     # Storing full data set and missing statistics  in ../data/data_generated/
     print("Storing full data set and missing statistics  in ../data/data_generated/")
     full_df.to_csv("../data/data_generated/full_df.csv")
-    missing.to_scv("../data/data_generated/missing.csv")
+    missing.to_csv("../data/data_generated/missing.csv")
 
     # Testing the full dataset for NaNs
     print("Testing the full dataset for NaNs")
