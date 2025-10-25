@@ -413,15 +413,19 @@ if __name__ == "__main__":
     # Making full data set 
     print("Making full data set")
     full_df, missing = ips_omni.make_final_data(ips_omni.df_5, ips_omni.omni_df)
-
+    
     # Storing full data set and missing statistics  in ../data/data_generated/
     print("Storing full data set and missing statistics  in ../data/data_generated/")
     full_df.to_csv("../data/data_generated/full_df.csv")
     missing.to_csv("../data/data_generated/missing.csv")
 
+    # # Copying full_df
+    # print("Copying full_df")
+    # full_df = pd.read_csv("../data/data_generated/full_df.csv")
+
     # Testing the full dataset for NaNs
     print("Testing the full dataset for NaNs")
-    if int((full_df == pd.isnull).sum().sum()) != 0:
+    if full_df.isnull().sum().sum() != 0:
         print(colored("Error in full_df, NaNs found!", "red"))
         for column in full_df.columns:
             # print(column, full_df[column].isnull().sum()) 
