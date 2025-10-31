@@ -134,7 +134,7 @@ It is expected that this Transformer model provides a base model at least as goo
 **Rohan R. Poojary, Dattaraj Dhuri**  
 Researchers in Space Weather Prediction & Machine Learning in Prof. Shravan Hanasoge's group.
 📧 rohan.poojary@protonmail.com  
-🌐 [personal website](https://roninrp.github.io/)
+🌐 [personal website: https://roninrp.github.io/](https://roninrp.github.io/)
 
 ---
 
