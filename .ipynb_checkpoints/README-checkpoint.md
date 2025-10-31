@@ -98,11 +98,11 @@ The datasets were synchronized and normalized to create a continuous time series
 
 | Metric | Value | Notes |
 |--------|--------|------|
-| **MAE** | 35.2 km/s | 24-hour forecast horizon |
-| **RMSE** | 48.6 km/s | Test set (OMNI data) |
-| **R²** | 0.83 | Strong correlation with observed solar wind speed |
+| **MAE** | --| 96-hour forecast horizon |
+| **RMSE** |-- | Under analysis |
+| **R²** | -- | Under analysis |
 
-These results demonstrate that the Transformer model effectively captures temporal dynamics of solar wind variability and performs competitively compared to traditional RNN-based models.
+It is expected that this Transformer model provides a base model at least as good as if not better than the Transformer model used to predict the Solar-wind time-series data using the OMNI data with 27, 54 and 81 days persistence along with the solar images. 
 
 ---
 
