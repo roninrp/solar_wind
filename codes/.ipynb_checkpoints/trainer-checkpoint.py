@@ -24,14 +24,14 @@ import codes.mnn_Utils as mnn
 from codes.make_dataset import DatasetHist
 
 runCount = 0
-device = torch.device("cuda") 
-# device = torch.device("xpu") 
-epochs = 15
-train_steps = 5000
+# device = torch.device("cuda") 
+device = torch.device("xpu") 
+epochs = 10
+train_steps = 1000
 
 # Load path for output-----------------------------------------------------------------------------------------------------------
 resultsPath = "../model_outputs/"
-mString = 'base_test_en_quartered'
+mString = 'base_test_en_1/30'
 
 # Load paths for train, val and test -----------------------------------------------------------------------------------------------
 train_path = "../data/data_generated/train/train_ips_omni_df.csv"
