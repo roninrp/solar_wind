@@ -86,7 +86,7 @@ This architecture allows the model to learn both short- and long-term solar wind
 
 | Dataset | Description | Source |
 |----------|--------------|--------|
-| **IPS** | Interplanetary Scintillation data (solar wind proxy) | [Nagoya University IPS Data Center](https://stsw1.isee.nagoya-u.ac.jp/ips_data-e.html) |
+| **IPS** | Interplanetary Scintillation data (solar wind proxy) | [Nagoya University IPS Data Center](https://stsw1.isee.nagoya-u.ac.jp/vlist/) |
 | **OMNI** | Solar wind plasma and magnetic field parameters | [NASA OMNIWeb](https://omniweb.gsfc.nasa.gov/) |
 | **Sunspot** | Daily sunspot number index | [Royal Observatory of Belgium SILSO](https://www.sidc.be/silso/datafiles) |
 
@@ -132,9 +132,9 @@ It is expected that this Transformer model provides a base model at least as goo
 
 ## 🧑‍💻 Authors
 **Rohan R. Poojary, Dattaraj Dhuri**  
-Researcher in Space Weather Prediction & Machine Learning  
-📧 your.email@example.com  
-🌐 [your website or LinkedIn]
+Researchers in Space Weather Prediction & Machine Learning in Prof. Shravan Hanasoge's group.
+📧 rohan.poojary@protonmail.com  
+🌐 [personal website](https://roninrp.github.io/)
 
 ---
 
