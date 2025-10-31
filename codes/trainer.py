@@ -25,12 +25,13 @@ from codes.make_dataset import DatasetHist
 
 runCount = 0
 device = torch.device("cuda") 
-epochs = 2
-train_steps = 2
+# device = torch.device("xpu") 
+epochs = 15
+train_steps = 5000
 
 # Load path for output-----------------------------------------------------------------------------------------------------------
-resultsPath = "../model_ouputs/"
-mString = 'base_test_en'
+resultsPath = "../model_outputs/"
+mString = 'base_test_en_quartered'
 
 # Load paths for train, val and test -----------------------------------------------------------------------------------------------
 train_path = "../data/data_generated/train/train_ips_omni_df.csv"
@@ -55,9 +56,9 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
     epochs: number of epochs to be trained
     """
     # Get data loaded
-    train_load = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    val_load = DataLoader(val_set, batch_size=batch_size, shuffle=True)
-    test_load = DataLoader(test_set, batch_size=len(test_set), shuffle=False)
+    train_load = DataLoader(train_set, batch_size=batch_size, shuffle=True, **kwargs)
+    val_load = DataLoader(val_set, batch_size=batch_size, shuffle=False, **kwargs)
+    test_load = DataLoader(test_set, batch_size=len(test_set), shuffle=False, **kwargs)
 
     # Load model
     model = mnn.model_base(xCh=13, LEN=32, emDim=128, dropout=dropout, device=device)
@@ -93,10 +94,10 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
             # zero the parameter gradients
             optimizer.zero_grad()
             loss, y_loss = doStep(data)
-            print(i, "epoch:", epoch, ";", "loss", loss.item())
+            # print(i, "epoch:", epoch, ";", "loss", loss.item())
             del data
 
-            print(loss.dtype)
+            # print(loss.dtype)
             loss.backward()
             optimizer.step()
 
@@ -108,13 +109,17 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
         # print statistics
         running_loss = running_loss/train_steps
         running_loss_y = running_loss_y/train_steps
-        print('Run %d [Epoch %d] loss: %.4e' %(run_count, epoch, running_loss_y*800.0))
+        print("")
+        print(lr, weight_decay, dropout, batch_size, gamma)
+        print('Train:  Run %d [Epoch %d] loss: %.4e' %(run_count, epoch, running_loss_y*800.0))
         return running_loss, running_loss_y
 
     def doStep(data):
-        x = data[1].to(torch.float32).to(device)
+        x = data[1].to(torch.float32)
+        x = x.to(device)
         # print("x", x)
-        y = data[2].to(torch.float32).to(device)
+        y = data[2].to(torch.float32)
+        y = y.to(device)
         y_out = model(x)
         # print("Before backward:", torch.isnan(y_out).any()) 
 
@@ -143,7 +148,7 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
             # print statistics
             running_loss = running_loss/val_steps
             running_loss_y = running_loss_y/val_steps
-            print('Run %d [Epoch %d] val loss: %.4e' %(run_count, epoch, running_loss_y*800.0))
+            print('Validate:  Run %d [Epoch %d] val loss: %.4e' %(run_count, epoch, running_loss_y*800.0))
         return running_loss, running_loss_y
 
     def evalModel(bestCorr, bestMse, bestEpoch):
@@ -152,12 +157,13 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
             for batch in test_load:
                 testBatch = batch
                 break
-            x = testBatch[1].to(torch.float32).to(device)
+            x = testBatch[1].to(torch.float32)
+            x = x.to(device)
             # y = testBatch[2]
             opY = model(x).detach().cpu().numpy()
 
         refY = testBatch[2].numpy()
-        print("refY.shape", refY.shape)
+        # print("refY.shape", refY.shape)
 
         corrVals = [-1.0,-1.0,-1.0,-1.0]
         mseVals = [300.0,300.0,300.0,300.0]
@@ -169,14 +175,16 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
             mseVals[i] = np.mean(np.sqrt((thisOp-thisRef)**2)*800.0)
         if corrVals[-1] > bestCorr[-1]:
             bestCorr = corrVals
-            torch.save(model.state_dict(), resultsPath + 'models/%s_%s'%(mString,paraString))
+            torch.save(model.state_dict(), resultsPath + 'models/%s_%s'%(mString, paraString))
             bestMse = mseVals
             bestEpoch = epoch
-        print(epoch, bestCorr, bestEpoch)
+        print("Evaluate:  ", " epoch:", epoch, ", bestCorr:", bestCorr, ", bestEpoch:", bestEpoch)
         return bestCorr, bestMse, bestEpoch  
 
     for epoch in range(1, epochs + 1):
+        print(f"Training epoch {epoch} =================================================================================")
         tlosses = train(train_load, epoch, run_count, train_steps)
+        print(f"Validating epoch {epoch}")
         vlosses = validate(len(val_set)//batch_size, epoch, run_count)
         scheduler.step()
 
@@ -187,17 +195,18 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
         val_Loss_y[epoch-1] = vlosses[1]
         
         if epoch > 1:
-    	    bestCorr, bestMse, bestEpoch = evalModel(bestCorr, bestMse, bestEpoch)
+            print(f"Evaluating epoch {epoch}")
+            bestCorr, bestMse, bestEpoch = evalModel(bestCorr, bestMse, bestEpoch)
     
-    train_Loss.dump(resultsPath + 'losses/%s_train_%s'%(mString,paraString))
-    val_Loss.dump(resultsPath + 'losses/%s_val_%s'%(mString,paraString))
-    train_Loss_y.dump(resultsPath + 'losses/%s_train_y_%s'%(mString,paraString))
-    val_Loss_y.dump(resultsPath + 'losses/%s_val_y_%s'%(mString,paraString))
+    train_Loss.dump(resultsPath + 'losses/%s_train_%s'%(mString, paraString))
+    val_Loss.dump(resultsPath + 'losses/%s_val_%s'%(mString, paraString))
+    train_Loss_y.dump(resultsPath + 'losses/%s_train_y_%s'%(mString, paraString))
+    val_Loss_y.dump(resultsPath + 'losses/%s_val_y_%s'%(mString, paraString))
     with open(resultsPath + 'corrsM2e','a') as fl:
         #fl.write('%s_%s\t%0.6f\t%0.6f\t%d\n'%(mString,paraString,bestCorr,bestMse,bestEpoch))
-        fl.write('%s_%s'%(mString,paraString))
+        fl.write('%s_%s'%(mString, paraString))
         for i in range(4):
-            fl.write('\t%0.6f\t%0.6f'%(bestCorr[i],bestMse[i]))
+            fl.write('\t%0.6f\t%0.6f'%(bestCorr[i], bestMse[i]))
         fl.write('\t%d\n'%bestEpoch)
     print(lr, time.time() - startT)
     return
@@ -208,6 +217,8 @@ weight_decays = [1.0e-4,1.0e-3] #weight decay regularization
 dropouts = [0.3,0.2,0.4]  #dropouts
 batch_sizes = [32,16,64]      # batchsize
 gammas = [0.95,0.90,0.85]#,0.80] #learning rate scheduler, reduces the learning rate as training gets cloes to the minima
+kwargs = {'num_workers': 4, 'pin_memory': True}
+torch.manual_seed(1)
 
 # Define run count
 run_count = 0

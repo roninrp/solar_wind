@@ -1,16 +1,22 @@
 [project]
-name = "solar_wind"
-version = "0"
+name = "solar-wind"
+version = "0.1.0"
+description = "Solr wind forcasting"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
 dependencies = [
+    "jupyter>=1.1.1",
+    "lab>=8.5",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "pandas>=2.3.3",
+    "scipy>=1.16.2",
     "seaborn>=0.13.2",
-    "termcolor>=3.1.0",
-    "torch>=2.9.0",
+    "torch",
+    "torchaudio",
+    "torchvision",
 ]
 
-[dependency-groups]
-dev = [
-    "jupyterlab>=4.4.9",
-]
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/xpu"
+default = true
