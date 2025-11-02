@@ -124,7 +124,7 @@ It is expected that this Transformer model provides a base model at least as goo
 ---
 
 ## 📈 Future Work
-- Incorporate additional encoders for OMNI 27-54-81 days persistence and solar images into a multi encoder-decoder transformer architechture.   
+- Incorporate additional encoders for OMNI 27-54-81 days persistence and EUV solar images into a multi encoder-decoder transformer architechture extending recent work [A Multimodal Encoder–Decoder Neural Network for Forecasting Solar Wind Speed at L1](https://iopscience.iop.org/article/10.3847/1538-4365/adf436/meta) 
 - Incorporate continious data ingestion and training from the above varied sources for viable prediction.  
 - Deploy model via a **real-time inference API** for operational prediction systems  
 
