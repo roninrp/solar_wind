@@ -157,7 +157,7 @@ It is expected that this Transformer model provides a base model at least as goo
 - **NumPy**, **Pandas**, **Matplotlib**, **Scipy**
 
 The whole project is actually managed by a uv environment with the above requirements.txt generated from it. 
-For a full description of the installing intel-xpu drivers compatible with the above packages visit [install link]()
+For a full description of the installing intel-xpu drivers compatible with the above packages visit [setup link](https://roninrp.github.io/install_1.html)
 
 ---
 
@@ -170,7 +170,7 @@ For a full description of the installing intel-xpu drivers compatible with the a
 
 ## 🧑‍💻 Authors
 **Rohan R. Poojary, Dattaraj Dhuri**  
-Researchers in Space Weather Prediction & Machine Learning in Prof. Shravan Hanasoge's group.
+Researchers in Space Weather Prediction & Machine Learning in **Prof. Shravan Hanasoge's group**.
 
 📧 rohan.poojary@protonmail.com  
 🌐 [personal website: https://roninrp.github.io/](https://roninrp.github.io/)
