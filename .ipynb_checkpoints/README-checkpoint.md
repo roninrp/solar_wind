@@ -156,7 +156,7 @@ It is expected that this Transformer model provides a base model at least as goo
 - **PyTorch**, with xpu support
 - **NumPy**, **Pandas**, **Matplotlib**, **Scipy**
 
-The whole project is actually managed by a uv environment (see[uv package manager](https://docs.astral.sh/uv/)) with the above requirements.txt generated from it. 
+The whole project is actually managed by a uv environment (see [uv package manager](https://docs.astral.sh/uv/)) with the above requirements.txt generated from it. 
 For a full description of the installing intel-xpu drivers compatible with the above packages visit [setup link](https://roninrp.github.io/install_1.html)
 
 ---
