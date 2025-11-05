@@ -53,14 +53,18 @@ def get_config_corr(model_name: str):
     corr_df = pd.read_csv("../model_outputs/corrsM2e", sep="\t", names=["path", "corr_9", "mse_9", "corr_11", "mse_11", "corr_13", "mse_13", "corr_15", "mse_15", "best_epoch"])
     # Find Corrs for lowest loss
     best_corr_str = best_config[:len(model_name)] + best_config[len(model_name) + 4:] 
-    print(best_corr_str)
+    print("Configuration with minmum loss")
+    print(best_corr_str, "\n")
+    print("Related Correlators and MSEs")
     corr = corr_df[(corr_df.path == best_corr_str)].to_string()
-    print(corr)
+    print(corr, "\n")
     # Find Corrs for lowest y scaled loss
     best_corr_y_str = best_y_config[:len(model_name)] + best_y_config[len(model_name) + 6:]
-    print(best_corr_y_str)
+    print("Configuration with minmum y-scaled loss")
+    print(best_corr_y_str, "\n")
+    print("Related Correlators and MSEs")
     corr_y = corr_df[(corr_df.path == best_corr_y_str)].to_string()
-    print(corr_y)
+    print(corr_y, "\n")
 
     return best_corr_str, corr, best_corr_y_str, corr_y
 
