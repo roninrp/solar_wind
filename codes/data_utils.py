@@ -1,3 +1,4 @@
+from termcolor import colored
 import subprocess
 import os
 import pandas as pd
@@ -9,7 +10,6 @@ from time import sleep
 import seaborn as sns
 import pickle
 pd.set_option('display.float_format', lambda x: f'{x:.10f}')
-from termcolor import colored
 
 """
 This module contains the class ips_omni_processor() which allows the making of input data from:
@@ -45,9 +45,9 @@ Begining at every hour i of the omni_data construct
 
         Returns:
         -----------------------------------------------------------------------------------------------------------------------------------------------------------
-        A list s.t. each row is a list [i, x, y] where 
+        A list s.t. each row is a list [i, x, y] where
         i: is the index starting from 0
-        y: is the above target and 
+        y: is the above target and
         x: is the above (2dim with x.shape:(32, #selected columns from ips_data)) input
 
         A missing list containing rows [i, missed] where
@@ -69,19 +69,97 @@ Column
 8      GLO       Heliographic latitude of P-point (deg.)
 9      CARR      Carrington rotation number of P-point
 10     V         Solar wind velocity (km/s)
-                 The value of -999 means that no velocity estimate is 
+                 The value of -999 means that no velocity estimate is
                  available.
 11     ER        The error in velocity estimation (km/s)
                  The vale of -999 means either that only two station could
                  be used to calculate the speed, or that no velocity estimate
                  is available.
-12     SC-INDX   Scintillation level (in arbitrary unit) observed 
+12     SC-INDX   Scintillation level (in arbitrary unit) observed
                  at either Fuji or Kiso station.
 -------------------------------------------------------------------------
 """
 
+
 class ips_omni_processor():
+    """
+	A processor for constructing training datasets by combining IPS (Interplanetary Scintillation)
+	measurements, OMNI solar-wind data, and daily sunspot numbers.
+
+	This class loads, cleans, aligns, and time-calibrates IPS and OMNI data, merges them
+	with sun-spot information, and provides utilities for extracting structured inputs
+	and forecasting targets for machine-learning pipelines.
+
+	The processor performs the following high-level steps:
+
+	1. Reads IPS files named "VLIST<yy>" for years 1983–2024, merges them,
+	   converts dates, cleans velocity/error formats, and calibrates timestamps.
+
+	2. Loads curated OMNI solar-wind data, formats timestamps into the same time scale
+	   used for IPS data, and extracts smoothed solar-wind speed.
+
+	3. Loads daily sun-spot totals, cleans missing values, and merges the relevant
+	   time span with IPS data.
+
+	4. Produces a combined, time-normalized IPS dataset (`df_5`) with selected
+	   physical parameters, scaled to [0, 1] except for time.
+
+	The class offers helper utilities to rank IPS observations, fill time-brackets,
+	and assemble complete training datasets where:
+
+	- **X** consists of 32 selected IPS observations spanning 8 days into the past
+	- **y** consists of 16 OMNI observations spanning 4 days into the future
+	- **idx** is the sample index
+
+	Parameters
+	----------
+	ips_path : str
+		Path to directory containing IPS files named "VLIST<yy>".
+
+	omni_path : str
+		Path to the CSV file containing OMNI data with smoothed solar-wind speed.
+
+	sun_spot_path : str
+		Path to the sunspot dataset with daily totals.
+
+	Notes
+	-----
+	- The class initializes heavy datasets on construction; instantiation may take time.
+	- Time is normalized to a 0–1000 scale by referencing an artificial epoch (2050-01-01).
+	- IPS data rows with poor quality (e.g., `er_1 == 1`, extreme distances) are filtered out.
+    """
     def __init__(self, ips_path, omni_path, sun_spot_path):
+        """
+    	Initialize the processor by loading IPS data, OMNI solar-wind data,
+    	and sun-spot counts, converting timestamps, merging datasets, and
+    	constructing the cleaned and scaled IPS feature matrix (`df_5`).
+    
+    	This method performs:
+    	- File discovery for IPS "VLIST" yearly files
+    	- Reading and cleaning the sunspot dataset
+    	- Timestamp construction for IPS and OMNI
+    	- Velocity/error corrections and encoding of missing-error flags (`er_1`)
+    	- Filtering low-quality IPS observations
+    	- Scaling IPS physical parameters to [0, 1] (except time)
+    	- Aligning IPS and OMNI time ranges to allow training-window construction
+    
+    	Parameters
+    	----------
+    	ips_path : str
+    		Path to directory containing IPS VLIST files.
+    
+    	omni_path : str
+    		Path to the OMNI data file (CSV) containing smoothed solar-wind speed.
+    
+    	sun_spot_path : str
+    		Path to the sun-spot data file with daily total sunspot numbers.
+    
+    	Notes
+    	-----
+    	- Produces the processed IPS dataset `self.df_5` and OMNI dataset `self.omni_df`.
+    	- Internally computes several calibration constants such as `delta_t`, `delta_6`, `delta_8`.
+    	"""
+
         self.ips_path = ips_path
         self.omni_path = omni_path
         self.sun_spot_path = sun_spot_path
@@ -159,6 +237,30 @@ class ips_omni_processor():
         
 
     def make_ips_df(self):
+        """
+    	Read and assemble all IPS yearly files, clean velocity/error fields,
+    	construct timestamps, and return a unified IPS DataFrame.
+    
+    	This method:
+    	1. Iterates through expected VLIST files (1983–2024)
+    	2. Reads columns defined by the IPS file specification
+    	3. Fixes cases where velocity and error fields are encoded as strings
+    	4. Creates an `er_1` flag indicating missing/invalid velocity data
+    	5. Converts YRMNDY (year-month-day code) to a proper datetime
+    	6. Adds hourly UT timestamps to form complete datetime values
+    	7. Returns the final DataFrame without scaling or filtering
+    
+    	Returns
+    	-------
+    	pd.DataFrame
+    		IPS dataset with unified formatting, corrected velocity fields,
+    		missing-error flags, and full timestamps.
+    
+    	Notes
+    	-----
+    	- This method does not perform physical filtering (e.g., distance constraints);
+    	  filtering occurs later during initialization.
+    	"""
         for x in self.file_name:
             indx_strt = self.df_test_1.shape[0]
             df_test_0 = pd.read_csv(self.ips_path + x, sep=r'\s+', skipinitialspace=True, skiprows=8, header=None, 
@@ -206,16 +308,26 @@ class ips_omni_processor():
 
     def find_ranked_er(self, time, time_delta):
         """
-        Parameters:
-        --------------------------------------------------
-        time: time in df_5.time format
-        time_delta: time interval in df_5.time format
-
-
-        Returns:
-        -------------------------------------------------
-        np.array of ranked list of df_5 indices according to least error i.e. df_5.er
-        """
+    	Return IPS observation indices within a given backward time interval,
+    	sorted by ascending velocity-estimation error.
+    
+    	Parameters
+    	----------
+    	time : float
+    		The upper time bound in the unified IPS time scale (0–1000).
+    
+    	time_delta : float
+    		Length of the backward interval to search (in same units as `time`).
+    
+    	Returns
+    	-------
+    	np.ndarray
+    		Array of DataFrame indices sorted by increasing `er` values.
+    		If the interval contains no observations, returns an empty array.
+    
+    	Notes
+    	-----
+    	- Used by `fill_bracket` to identify the best IPS observation inside each sub-interval."""
         df = self.df_5.loc[(self.df_5.time <= time) & (self.df_5.time > time - time_delta)]
         if len(df) > 0:
             return df.er.sort_values().index
@@ -224,17 +336,33 @@ class ips_omni_processor():
 
     def fill_bracket(self, time_0, time_1, intervals):
         """
-        Params:
-        -----------------------------------------------
-        time_0: time in time formart of df_5
-        time_1: < time_0
-        intervals: total # equally spaced time intervals b/w time_0 and time_1
-
-        Returns:
-        -------------------------------------------------
-        'intervals' many obs- with one obs of least error in each interval, as a pd.DataFrame().values.
-        If no value is found in an interval, then its filled with the remainder set once all the intervals have been filled with the best within them 
-        """
+    	Select IPS observations over a backward time range and fill a fixed-size
+    	bracket of `intervals` observations, choosing those with the lowest error
+    	within each sub-interval.
+    
+    	Parameters
+    	----------
+    	time_0 : float
+    		Upper time bound (current OMNI time).
+    
+    	time_1 : float
+    		Lower time bound (8 days before the current OMNI time).
+    
+    	intervals : int
+    		Number of equal-length time segments to fill (typically 32).
+    
+    	Returns
+    	-------
+    	pd.DataFrame
+    		A DataFrame containing one IPS observation per interval.
+    		If an interval has no observations, it is filled using remaining
+    		lowest-error observations from other intervals.
+    
+    	Notes
+    	-----
+    	- Returned rows are sorted by descending time.
+    	- Missing rows may later be padded during training-data construction.
+    	"""
         time_delta = (time_0 - time_1)/intervals # size of each interval
         # print(time_delta)
         df = self.df_5.loc[(self.df_5.time <= time_0) & (self.df_5.time > time_1)].copy()
@@ -283,33 +411,48 @@ class ips_omni_processor():
 
     def make_training_data(self, ips_data, omni_data, min_input_len=20):
         """
-        Construct training data as follows:
-        Begining at every hour i of the omni_data construct
-        the target y: 16 omni_data obs into the future begining at hour i i.e. omin_data 4 days into the future
-        the input  x: best ips_data from 8-days into the past begining from the hour i as a pd.DataFrame().values
-
-
-        The length of the omni_data controls the length of the output.
-        If the input x generated doesn't have length of min_len_input then the data corresponding to the hour i is not considered.
-
-        Params:
-        -----------------------------------------------------------------------------------------------------------------------------------------------------------
-        omni_data: omni data as pd.DataFrame with time as in time in df_5 and smoothed hourly solar wind speed.
-        ips_data: ips pd.DataFrame() with relevant columns and time as above along with sun spot numbers for the relevant days.
-        min_input_len: min number of ips_data in the past 8-days- if less, then the data point is skipped.
-
-        Returns:
-        -----------------------------------------------------------------------------------------------------------------------------------------------------------
-        A list s.t. each row is a list [i, x, y] where 
-        i: is the index starting from 0
-        y: is the above target and 
-        x: is the above (2dim with x.shape:(32, #selected columns from ips_data)) input
-
-        A missing list containing rows [i, missed] where
-        i: the index where no.of x data generated is not of length of 32
-        missed: length of x data
-        """
-
+    	Construct the full training dataset by pairing each OMNI time point with:
+    
+    	- **X**: up to 32 IPS observations from the previous 8 days
+    	- **y**: the next 16 OMNI observations (4 days of hourly data)
+    
+    	The method slides over the OMNI timeline and for each valid index:
+    
+    	1. Builds the IPS input bracket via `fill_bracket`
+    	2. Pads missing IPS rows with zeros so that X always has 32 rows
+    	3. Constructs the 16-step OMNI prediction target
+    	4. Tracks cases where fewer than 32 IPS points were available
+    	5. Skips samples where fewer than `min_input_len` IPS points exist
+    
+    	Parameters
+    	----------
+    	ips_data : pd.DataFrame
+    		Processed IPS dataset with normalized physical columns and time stamps.
+    
+    	omni_data : pd.DataFrame
+    		OMNI dataset with time stamps and smoothed solar-wind speed.
+    
+    	min_input_len : int, default=20
+    		Minimum number of IPS observations required to construct a sample.
+    
+    	Returns
+    	-------
+    	out_df : pd.DataFrame
+    		DataFrame where each row corresponds to a training sample containing:
+    		- `idx`
+    		- 32 × (IPS feature columns)
+    		- 16 × (target OMNI values)
+    
+    	missing_df : pd.DataFrame
+    		Rows where IPS bracket length < 32, containing:
+    		- sample index
+    		- number of available IPS observations
+    
+    	Notes
+    	-----
+    	- Only one OMNI target column is used (non-time columns).
+    	- Zero-padding maintains consistent input shape for neural networks.
+    	- Prints diagnostic information about skipped samples."""
         out_data = [] 
         j = 0  # index 
         k = 0  # no.of samples skipped
@@ -394,7 +537,31 @@ class ips_omni_processor():
         return out_df, missing_df
 
     def make_final_data(self, ips_df, omni_df):
-        # Making the final data 
+        """
+    	Generate the final cleaned training dataset and rescale time-related
+    	features for compatibility with learning models.
+    
+    	This method:
+    	1. Calls `make_training_data` to construct X/Y samples
+    	2. Normalizes any column containing `"time"` by dividing by 1000
+    	3. Returns the final training DataFrame along with missing-sample metadata
+    
+    	Parameters
+    	----------
+    	ips_df : pd.DataFrame
+    		Processed IPS dataset.
+    
+    	omni_df : pd.DataFrame
+    		Processed OMNI dataset.
+    
+    	Returns
+    	-------
+    	out_df : pd.DataFrame
+    		Final normalized training dataset ready for modeling.
+    
+    	missing_df : pd.DataFrame
+    		Records of samples where IPS input length was < 32.
+    	"""
         out_df, missing_df = self.make_training_data(ips_df, omni_df)
         
         print(f"scaling output data's time columns")
@@ -403,9 +570,58 @@ class ips_omni_processor():
                 out_df[column] = out_df[column]/1000
         return out_df, missing_df
         
+def main():
+    """
+	Execute the full IPS–OMNI data-processing pipeline, generate the combined
+	training dataset, validate it, and produce train/validation/test splits.
 
+	This function performs the following workflow:
 
-if __name__ == "__main__":
+	1. **Instantiate the processor**
+	   Creates an `ips_omni_processor` configured with IPS, OMNI, and sun-spot
+	   inputs. This automatically loads, cleans, merges, aligns, and scales the
+	   three datasets.
+
+	2. **Generate the full machine-learning dataset**
+	   Calls `make_final_data()` to construct:
+	       - a full supervised learning table (`full_df`)
+	       - a summary table of samples with missing IPS values (`missing`)
+	   Both are saved under `../data/data_generated/`.
+
+	3. **Validate the dataset**
+	   - Scans `full_df` for NaNs.
+	   - Reports specific columns containing missing values.
+	   - Continues only if the dataset is fully valid.
+
+	4. **Create train/validation/test splits**
+	   - Uses the IPS/OMNI time scale to ensure **no temporal overlap** between
+	     splits. The target spans 4 days into the future, so a buffer of 4 days
+	     (`fourdays = delta_8 / 2000`) is enforced.
+	   - Finds boundary indices for:
+	       • train → val  
+	       • val → test  
+	     by identifying the nearest non-overlapping timestamps.
+
+	5. **Save the splits**
+	   Stores the resulting DataFrames in:
+	       - `../data/data_generated/train/`
+	       - `../data/data_generated/val/`
+	       - `../data/data_generated/test/`
+
+	Notes
+	-----
+	- Splits are based on the encoded time variable `X_time_trgt_0`, which
+	  represents the normalized time of the IPS–OMNI match event.
+	- The split logic ensures that validation and test sets contain only
+	  temporally future data relative to the training set.
+	- File paths are relative to the project root and may be adjusted as needed.
+
+	Outputs
+	-------
+	No return value.
+	Side-effects:
+	    • Writes multiple CSV files to `../data/data_generated/`
+	    • Prints progress diagnostics and NaN-detection messages"""
     ips_omni = ips_omni_processor(ips_path="../data/test_dwnld/", 
                                   sun_spot_path='../data/SN_d_tot_V2.0.csv', 
                                   omni_path='../data/omni_avg_normalised_smoothed_extened.csv'
@@ -469,3 +685,7 @@ if __name__ == "__main__":
         train_ips_omni_df.to_csv("../data/data_generated/train/train_ips_omni_df.csv", index=False)
         val_ips_omni_df.to_csv("../data/data_generated/val/val_ips_omni_df.csv", index=False)
         test_ips_omni_df.to_csv("../data/data_generated/test/test_ips_omni_df.csv", index=False)
+
+if __name__ == "__main__":
+    main()
+    

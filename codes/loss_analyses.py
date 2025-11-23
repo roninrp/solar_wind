@@ -14,32 +14,55 @@ loss_path_lists = os.listdir(loss_path)
 # Make Data frame
 loss_df = pd.DataFrame({"loss_path": loss_path_lists})
 # Load losses for all files
-loss_df["loss_arr"] = [np.load(loss_path + x, allow_pickle=True) for x in loss_df.loss_path]
+loss_df["loss_arr"] = [
+    np.load(
+        loss_path + x,
+         allow_pickle=True) for x in loss_df.loss_path]
 # Find final loss values
 loss_df["loss_arr_fin"] = [x[-1] for x in loss_df.loss_arr]
 
 
-
-
 def get_config_corr(model_name: str):
-    """
-    Returns the best configuration and corresponding correlation and mse for the given model name.
+	"""
+	Get the best configuration (based on loss and y-scaled loss) and their corresponding
+	correlations and mean squared errors (MSEs) for a given model name.
 
-    Prameter:
-    ---------
-    
-    model_name = str name of the model
+	This function filters a global ``loss_df`` DataFrame for entries corresponding to the
+	specified model, identifies the configurations with minimum loss and minimum
+	y-scaled loss, and then retrieves their associated correlation and MSE metrics from an
+	external correlations file (``corrsM2e``).
 
-    Returns:
-    --------
-    
-    Tuple: (best_config, corr, best_y_config, corr_y)
-    
-    best_config = Best config with lowest loss
-    corr = corresponding correlations and mse
-    best_y_config = Best config with lowest y-scaled loss
-    corr_y = corr = corresponding correlations and mse
-    """
+	Parameters
+	----------
+	model_name : str
+		Name of the model for which configurations and metrics should be retrieved.
+
+	Returns
+	-------
+	tuple
+		A 4-tuple containing:
+
+		- **best_config** : str
+			The configuration path corresponding to the lowest non-scaled loss.
+
+		- **corr** : str
+			Correlation and MSE table (as a string) for ``best_config``.
+
+		- **best_y_config** : str
+			The configuration path corresponding to the lowest y-scaled loss.
+
+		- **corr_y** : str
+			Correlation and MSE table (as a string) for ``best_y_config``.
+
+	Notes
+	-----
+	- This function expects that a global DataFrame named ``loss_df`` exists
+	  and contains at least the columns: ``loss_path`` and ``loss_arr_fin``.
+	- Correlation values are read from ``../model_outputs/corrsM2e``, which is expected
+	  to be a tab-separated file with predefined column names.
+	- Printed output includes human-readable summaries of the selected configurations
+	  and their losses before returning the results.
+	"""
     # Make dataframe for the given mode
     loss_model_df = loss_df[(loss_df.loss_path.apply(lambda x: x[:len(model_name) + 6]) == model_name + "_val_y") | (loss_df.loss_path.apply(lambda x: x[:len(model_name) + 6]) == model_name + "_val_l") ]. copy()
     # Create index for val loss measured is scaled with y or not
@@ -53,15 +76,17 @@ def get_config_corr(model_name: str):
     corr_df = pd.read_csv("../model_outputs/corrsM2e", sep="\t", names=["path", "corr_9", "mse_9", "corr_11", "mse_11", "corr_13", "mse_13", "corr_15", "mse_15", "best_epoch"])
     # Find Corrs for lowest loss
     best_corr_str = best_config[:len(model_name)] + best_config[len(model_name) + 4:] 
-    print("Configuration with minmum loss")
-    print(best_corr_str, "\n")
+    print("\n", "Configuration with minimum loss")
+    print(best_corr_str, "\n", "With minimum loss at")
+    print(loss_model_df[loss_model_df.loss_path == best_config].loss_arr_fin.values)
     print("Related Correlators and MSEs")
     corr = corr_df[(corr_df.path == best_corr_str)].to_string()
     print(corr, "\n")
     # Find Corrs for lowest y scaled loss
     best_corr_y_str = best_y_config[:len(model_name)] + best_y_config[len(model_name) + 6:]
-    print("Configuration with minmum y-scaled loss")
-    print(best_corr_y_str, "\n")
+    print("Configuration with minimum y-scaled loss")
+    print(best_corr_y_str, "\n", "With minimum loss at", "\n")
+    print(loss_model_df[loss_model_df.loss_path == best_y_config].loss_arr_fin.values)
     print("Related Correlators and MSEs")
     corr_y = corr_df[(corr_df.path == best_corr_y_str)].to_string()
     print(corr_y, "\n")

@@ -19,6 +19,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 import random
 from termcolor import colored
+from tqdm import tqdm
 
 import codes.mnn_Utils as mnn
 from codes.make_dataset import DatasetHist
@@ -31,7 +32,7 @@ train_steps = 1000
 
 # Load path for output-----------------------------------------------------------------------------------------------------------
 resultsPath = "../model_outputs/"
-mString = 'base_test_en_1/30'
+mString = 'base_test_en_1by30'
 
 # Load paths for train, val and test -----------------------------------------------------------------------------------------------
 train_path = "../data/data_generated/train/train_ips_omni_df.csv"
@@ -90,7 +91,9 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
         model.train()
         running_loss = 0.0
         running_loss_y = 0.0
-        for i, data in enumerate(data_load):
+
+        loop = tqdm(enumerate(data_load), total=len(data_load), leave=False)
+        for i, data in loop:
             # zero the parameter gradients
             optimizer.zero_grad()
             loss, y_loss = doStep(data)
@@ -103,6 +106,10 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
 
             running_loss += loss.item()
             running_loss_y += y_loss.item()
+
+            # update progress bar:
+            loop.set_description(f"Epoch [{epoch}/{epochs}]")
+            loop.set_postfix(loss=loss.item())
             if i == train_steps:
                 break
 
@@ -135,13 +142,18 @@ def start_training(train_set, val_set, test_set, train_steps, epochs):
         with torch.no_grad():
             running_loss = 0.0
             running_loss_y = 0.0
-            for i, data in enumerate(val_load):
+
+            loop = tqdm(enumerate(val_load), total=len(val_load), leave=False)
+            for i, data in loop:
                 loss, y_loss = doStep(data)
                 print("val loss", loss)
                 del data
     
                 running_loss += loss.item()
                 running_loss_y += y_loss.item()
+
+                loop.set_description(f"Validate [{i}/{len(val_load)}]")
+                loop.set_postfix(loss=loss.item())
                 if i == val_steps:
                     break
     
@@ -225,12 +237,16 @@ run_count = 0
 
 if __name__ == "__main__":
     startT = time.time()
+    pbar = tqdm(total=len(lrs) * len(weight_decays) * len(dropouts) * len(batch_sizes) * len(gammas), leave=False)
     for lr in lrs:
         for weight_decay in weight_decays:
             for dropout in dropouts:
                 for batch_size in batch_sizes:
                     for gamma in gammas:
                         start_training(train_set, val_set, test_set, train_steps, epochs)
+                        pbar.update(1)
+                        pbar.set_description(f" Hyper-parameters")
                         print(lr, weight_decay, dropout, batch_size, gamma)
                         run_count += 1
+    pbar.close()                    
     print(time.time() - startT)     
