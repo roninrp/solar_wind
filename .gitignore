@@ -1,6 +1,7 @@
 test_dwnld/
 *.zip
 *.csv
+model_outputs_corrected/
 data/
 model_outputs/
 *_checkpoints/

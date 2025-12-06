@@ -536,6 +536,206 @@ class ips_omni_processor():
 
         return out_df, missing_df
 
+    def make_target(self, omni_df):
+        """
+        Generate an extended target DataFrame containing 6-hourly rolling means
+        over a 4-day window.
+    
+        This function takes an input DataFrame with two columns (assumed to be
+        velocity and time), appends 16 zero-initialized target columns, and then
+        fills those target columns with consecutive 6-hour means of the first 
+        column. Each target column represents the mean over a 6-hour block, 
+        covering a total span of 4 days (16 blocks × 6 hours). Rows that do not 
+        have enough future data to compute all 16 targets remain padded with zeros.
+        Finally, rows where the first target value is non-positive are removed.
+    
+        Parameters
+        ----------
+        omni_df : pandas.DataFrame
+            Input dataframe with shape (N, 2). The first column is treated as
+            the source variable for computing 6-hour means, and rows are assumed
+            to be spaced at 1-hour intervals.
+    
+        Returns
+        -------
+        pandas.DataFrame
+            An extended dataframe of shape (N, 18), containing:
+            
+            - ``vel`` : original first column  
+            - ``time`` : original second column  
+            - ``target_0`` … ``target_15`` : 6-hour means computed from the
+              velocity column.  
+            
+            Rows where ``target_0 <= 0`` are filtered out in the final output.
+    
+        Notes
+        -----
+        - The function assumes strictly hourly sampling.
+        - Each target column ``target_k`` corresponds to the mean of a 
+          6-hour window:  
+          ``target_k = mean(vel[i + 6*k : i + 6*(k+1)])``.
+        - Only rows with full 4-day look-ahead (96 hours) receive valid target values.
+    
+        Examples
+        --------
+        >>> df = pd.DataFrame({"vel": [...], "time": [...]})
+        >>> out = make_target(df)
+        >>> out.head()"""
+    
+        # Stack 16 zeros to the right in every row
+        omni_vls_extd = np.hstack([omni_df.values, np.zeros((omni_df.values.shape[0], 16))])
+
+        # Compute consequtive 6-hourly means for 4-days (16 values) for every row.
+        # Assumes rows are separated by an hour.
+        for i in range(omni_vls_extd.shape[0] - 96):
+            for j in range(2, 18):
+                omni_vls_extd[i, j] = omni_vls_extd[i + 6*(j-2) : i + 6*(j-1), 0].mean()
+        
+        # Make column names 
+        column_names = [f"target_{i}" for i in range(16)]
+        column_names = ["vel", "time"] + column_names
+
+        # Make pd.Dataframe
+        omni_extnd_df = pd.DataFrame(omni_vls_extd, columns=column_names)
+        omni_extnd_df = omni_extnd_df[omni_extnd_df.target_0 > 0.0]
+
+        return omni_extnd_df
+
+
+    def make_training_data_correct(self, ips_data, omni_data, min_input_len=20):
+        """
+    	Construct the full training dataset by pairing each OMNI time point with:
+    
+    	- **X**: up to 32 IPS observations from the previous 8 days
+    	- **y**: the next 16 OMNI observations (4 days of hourly data)
+    
+    	The method slides over the OMNI timeline and for each valid index:
+    
+    	1. Builds the IPS input bracket via `fill_bracket`
+    	2. Pads missing IPS rows with zeros so that X always has 32 rows
+    	3. Constructs the 16-step OMNI prediction target
+    	4. Tracks cases where fewer than 32 IPS points were available
+    	5. Skips samples where fewer than `min_input_len` IPS points exist
+    
+    	Parameters
+    	----------
+    	ips_data : pd.DataFrame
+    		Processed IPS dataset with normalized physical columns and time stamps.
+    
+    	omni_data : pd.DataFrame
+    		OMNI dataset with time stamps and smoothed solar-wind speed.
+    
+    	min_input_len : int, default=20
+    		Minimum number of IPS observations required to construct a sample.
+    
+    	Returns
+    	-------
+    	out_df : pd.DataFrame
+    		DataFrame where each row corresponds to a training sample containing:
+    		- `idx`
+    		- 32 × (IPS feature columns)
+    		- 16 × (target OMNI values)
+    
+    	missing_df : pd.DataFrame
+    		Rows where IPS bracket length < 32, containing:
+    		- sample index
+    		- number of available IPS observations
+    
+    	Notes
+    	-----
+    	- Only one OMNI target column is used (non-time columns).
+    	- Zero-padding maintains consistent input shape for neural networks.
+    	- Prints diagnostic information about skipped samples."""
+        out_data = [] 
+        j = 0  # index 
+        k = 0  # no.of samples skipped
+        
+        # Making Target from omni data
+        print("Making Target from omni data")
+        omni_target = self.make_target(omni_data)
+        print("Made Target from omni data")
+        
+        missing = []
+        for i in range(len(omni_target)):
+            time = omni_target.iloc[i].time
+            x_brckt = self.fill_bracket(time, time - self.delta_8, 32) # x_brckt has max len 32, it can be smaller
+            x_brckt_len = len(x_brckt)
+            # Do not make sample if x_brckt has len < 20
+            if x_brckt_len < min_input_len:
+                k = k + 1
+                continue
+
+            # adding an extra column in x for keeping track of the time of the input
+            # this column has time as its entry for the first len(x_brckt) entries  
+            # and then np.zeros for the remainding entries upto 32 if len(x_brckt) < 32
+            # print(len(x_brckt))
+
+
+            if x_brckt_len < 32:
+                x_brckt_0 = pd.DataFrame(np.zeros(11*(32 - x_brckt_len)).reshape((32 - x_brckt_len), -1), columns=x_brckt.columns)
+                x_brckt = pd.concat([x_brckt, x_brckt_0])
+            if x_brckt_len == 32:
+                time_0 = time*np.ones(32)
+            else:
+                time_0 = np.concatenate([time*np.ones(x_brckt_len), np.zeros(32 - x_brckt_len)])
+                # print(j)
+            # time_0 = time*np.ones(32)
+            # x_brckt['time_trgt'] = pd.Series(time_0)
+            x_brckt['time_trgt'] = time_0
+            # Adding input column to indicate missing rows as 0
+            # x_brckt['input'] = pd.Series(np.concatenate([np.ones(x_brckt_len), np.zeros(32 - x_brckt_len)]), dtype=float)
+            x_brckt['input'] = np.concatenate([np.ones(x_brckt_len), np.zeros(32 - x_brckt_len)])
+            x_brckt['time'] = x_brckt['time_trgt'] - x_brckt['time']
+
+
+            # Test x_brckt['input'].sum()
+            # print(x_brckt['input'].values.sum(), x_brckt_len, pd.Series(np.concatenate([np.ones(x_brckt_len), np.zeros(32 - x_brckt_len)]), dtype=float).values.sum())
+            if x_brckt_len != x_brckt['input'].sum():
+                print(x_brckt['input'].sum(), x_brckt_len, x_brckt.input.values)
+
+
+            # Uncomment line below to return a list with X and y as pd.DataFrames
+            # out_data.append([j, x_brckt, omni_data.iloc[i: i + 16] ]) 
+
+            out_data.append([j] + list(x_brckt.values.reshape(-1)) + list(omni_target.iloc[i, 2:].values.reshape(-1))) # choosing only targets from omni_target
+
+            # Keep track of x_brckt when len < 32
+            if x_brckt_len < 32:
+                missing.append([j, x_brckt_len])
+
+            j = j + 1
+
+        print(f"{k} Data points skipped due to lack of atleast {min_input_len} IPS data points in the past 8-days.")
+
+        missing_df = pd.DataFrame(missing, columns=['id', 'missed'])
+        if len(missing) > 0:
+            print(missing_df.describe().to_string())
+        print(f"{j} Data points made.")
+        # return out_data, missing
+
+        clmns_ips = list(ips_data.columns)
+        clmns_ips.pop(0)
+        clmns_ips.append('time_trgt')
+        clmns_ips.append('input')
+        print(clmns_ips, len(clmns_ips))
+        clmns_input = []
+        for i in range(32):
+            for clmn in clmns_ips:
+                clmns_input.append(f"X_{clmn}_{i}")
+        # print(clmns_input)
+        clmns_omni = list(omni_data.columns)
+        clmns_target = []
+        for i in range(16):
+            for clmn in clmns_omni:
+                if 'time' not in clmn:  # choosing only one column from omni data
+                    clmns_target.append(f"y_{clmn}_{i}")
+        clmns_data = ['idx'] + clmns_input + clmns_target
+
+        out_df = pd.DataFrame(out_data, columns=clmns_data)
+
+        return out_df, missing_df
+
+    
     def make_final_data(self, ips_df, omni_df):
         """
     	Generate the final cleaned training dataset and rescale time-related
@@ -562,7 +762,8 @@ class ips_omni_processor():
     	missing_df : pd.DataFrame
     		Records of samples where IPS input length was < 32.
     	"""
-        out_df, missing_df = self.make_training_data(ips_df, omni_df)
+        # out_df, missing_df = self.make_training_data(ips_df, omni_df)
+        out_df, missing_df = self.make_training_data_correct(ips_df, omni_df)
         
         print(f"scaling output data's time columns")
         for column in out_df.columns:
@@ -632,8 +833,8 @@ def main():
     
     # Storing full data set and missing statistics  in ../data/data_generated/
     print("Storing full data set and missing statistics  in ../data/data_generated/")
-    full_df.to_csv("../data/data_generated/full_df.csv")
-    missing.to_csv("../data/data_generated/missing.csv")
+    full_df.to_csv("../data/data_generated/full_corrected_df.csv")
+    missing.to_csv("../data/data_generated/missing_corrected.csv")
 
     # # Copying full_df
     # print("Copying full_df")
@@ -654,14 +855,14 @@ def main():
 
         # Making train val and test splits
         print("Making train val and test splits")
-        # these are stored in ../data/data_generated/train/, ../data/data_generated/val/ and ../data/data_generated/test/ folders
-        print("these are stored in ../data/data_generated/train/, ../data/data_generated/val/ and ../data/data_generated/test/ folders")
+        # these are stored in ../data/data_generated/train_corrected/, ../data/data_generated/val_corrected/ and ../data/data_generated/test_corrected/ folders
+        print("these are stored in ../data/data_generated/train_corrected/, ../data/data_generated/val_corrected/ and ../data/data_generated/test_corrected/ folders")
     
         # Required so that there is no overlap between train, val and test. The minimum interval is 4 days as the target spans 4 days into the future.
         fourdays = ips_omni.delta_8/2000 
     
         # Finding the index for marking the train val slpit without overlap
-        print("Finding the index for marking the train val slpit without overlap")
+        print("Finding the index for marking the train val split without overlap")
         train_val_mark_0 = int(((2050 - ips_omni.delta_t*(1 - full_df.X_time_trgt_0 )//365) <= 2013).sum())
         print(train_val_mark_0)
         train_val_mark_1 = full_df.loc[(full_df.index >= train_val_mark_0) & (full_df.X_time_trgt_0 > full_df.iloc[train_val_mark_0].X_time_trgt_0 + fourdays)].index[0]
@@ -682,9 +883,9 @@ def main():
     
         # Storing train, val and test in seperate folders in  ../data/data_generated/
         print("Storing train, val and test in seperate folders in  ../data/data_generated/")
-        train_ips_omni_df.to_csv("../data/data_generated/train/train_ips_omni_df.csv", index=False)
-        val_ips_omni_df.to_csv("../data/data_generated/val/val_ips_omni_df.csv", index=False)
-        test_ips_omni_df.to_csv("../data/data_generated/test/test_ips_omni_df.csv", index=False)
+        train_ips_omni_df.to_csv("../data/data_generated/train_corrected/train_ips_omni_df.csv", index=False)
+        val_ips_omni_df.to_csv("../data/data_generated/val_corrected/val_ips_omni_df.csv", index=False)
+        test_ips_omni_df.to_csv("../data/data_generated/test_corrected/test_ips_omni_df.csv", index=False)
 
 if __name__ == "__main__":
     main()
